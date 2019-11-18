@@ -8,10 +8,22 @@ class CreateSQL:
     # def __init__(self):
     #     self.workbook = xlrd.open_workbook(FILE_DIR+FILE_NAME)
 
-    def _sql_body(self, data):
+    def _sql_body(self, data: pd.DataFrame):
         
+        sqlbody = ""
+        n = data.shape[1]
+        for i in range(n):
+            field = data["字段"][i]
+            filed_type = data["类型"][i]
+            default = data["默认值"][i]
+            null = data["非空"][i]
+            signifi = data["含义"][i]
+            sqlbody += " ".join([field, field_type, default, null])
 
     def _format_data(self, data):
+        '''
+        mysql的字段加上''，支持所有特殊表名、特殊字段名的创建
+        '''
         pass
 
     def _drop_sql(self, data: pd.DataFrame):
@@ -28,20 +40,22 @@ class CreateSQL:
         ch_name = info["中文名"][0]
         partition = info["日期分区"][0]
         
-        '''根据数据库不同，格式化表格数据'''
+        # 根据数据库不同，格式化表格数据
         self._format_data(data)
 
         # 删除
         sql = self._drop_sql(data) if IFDROP else ""
 
-        # 建表
         '''
+        建表
         pgsql对表名、字段名大小写敏感，创建时自动转化为小写
         如果不想转换，需要对字段名加""
         '''
         sql += "create table " + tablename + ' /* '+ ch_name +' */'
 
         sql += self._sql_body(data)
+
+        return sql
 
 
     def create_table_sql(self):
@@ -63,7 +77,7 @@ class CreateSQL:
         for i in range(rows):
             info = catalog[:i+1]
             table_content = pd.read_excel(STATIC_URL, sheet_name=tables[i])
-    
+            return table_content
             if table_content.empty:
                 print("表%s读取失败"%tables[i])
             sql += self._create_sql_str(info, table_content)
