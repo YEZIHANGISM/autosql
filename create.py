@@ -9,8 +9,17 @@ class CreateSQL:
     # def __init__(self):
     #     self.workbook = xlrd.open_workbook(FILE_DIR+FILE_NAME)
 
-    def _sql_comment(self, data):
-        pass
+    def _sql_comment(self, info:pd.DataFrame, data:pd.DataFrame):
+        n = data.shape[0]
+        ch_name = info.at[0, "中文名"]
+        tablename = info.at[0, "表名"]
+        sqlcomment = "comment on table {} is '{}';\n".format(tablename, ch_name)
+        for i in range(1,n):
+            field = data.at[i, "字段"]
+            sign = data.at[i, "含义"]
+            sqlcomment += "comment on column {}.{} is '{}';\n".format(tablename, field, sign)
+
+        return sqlcomment
 
     def _sql_body(self, data: pd.DataFrame):
 
@@ -25,22 +34,24 @@ class CreateSQL:
             default = data.at[i,"默认值"]
             key = data.at[i, "键"]
             extra = data.at[i, "扩展"]
-            
-            fieldline = " ".join(["   ", field, ftype, default, key, extra, null, sign])
+            if DBTYPE.upper() =="MYSQL":
+                fieldline = " ".join(["   ", field, ftype, default, key, extra, null, sign])
+            else:
+                fieldline = " ".join(["   ", field, ftype, default, null])
             fields.append(fieldline)
         sqlbody += ",\n".join(fields)
-        sqlbody += "\n);\n/"
+        sqlbody += "\n);\n"
         return sqlbody
 
     def _format_data(self, data: pd.DataFrame):
+        n = data.shape[0]
         
         if DBTYPE.upper() == "MYSQL":
             '''字段格式化为小写，加上``'''
-            n = data.shape[0]
             for i in range(n):
                 data.at[i,"字段"] = "`{}`".format(data.at[i,"字段"].lower())
-                if data.at[i,"类型"].lower() == "integer":
-                    data.at[i,"类型"] = "int"
+                # if data.at[i,"类型"].lower() == "integer":
+                #     data.at[i,"类型"] = "int"
                 # nan值判断
                 if data.at[i,"含义"] == data.at[i,"含义"]:
                     data.at[i,"含义"] = "comment '{}'".format(data.at[i,"含义"])
@@ -50,10 +61,26 @@ class CreateSQL:
                 data.at[i,"默认值"] = "default {}".format(data.at[i,"默认值"]) if data.at[i,"默认值"]==data.at[i,"默认值"] else ""
                 data.at[i,"键"] = "" if data.at[i,"键"]!=data.at[i,"键"] else data.at[i,"键"]
                 data.at[i,"扩展"] = "" if data.at[i,"扩展"]!=data.at[i,"扩展"] else data.at[i,"扩展"]
+        
+        elif DBTYPE.upper() == "ORACLE":
+            '''oracle表名和字段名在创建时自动转化为大写'''
+            for i in range(n):
+                varchar = re.match(r'^[v|V]\w+', data.at[i, "类型"])
+                if varchar:
+                    data.at[i, "类型"] = re.sub(varchar.group(), "VARCHAR2", data.at[i, "类型"])
+                if data.at[i, "类型"].upper() in ["DATE", "DATETIME"]:
+                    data.at[i, "类型"] = "DATE"
+                if data.at[i, "默认值"] != data.at[i, "默认值"]:
+                    data.at[i, "默认值"] = ""
+                elif data.at[i, "默认值"] == "now()":
+                    data.at[i, "默认值"] = "default sysdate"
+                # elif data.at[i, "默认值"] != data.at[i, "默认值"]:
+                #     data.at[i, "默认值"] = ""
+                else:
+                    data.at[i, "默认值"] = "default {}".format(data.at[i, "默认值"])
+                data.at[i,"非空"] = "not null" if data.at[i,"非空"] else("null" if data.at[i,"非空"]!=data.at[i,"非空"] else "")
         else:
             print("未知的数据库类型")
-
-        
 
     def _drop_sql(self, info: pd.DataFrame):
         if DBTYPE.upper() == "MYSQL":
@@ -96,7 +123,8 @@ end;
         sql += "create table " + tablename + '(\n'
         print(data)
         sql += self._sql_body(data)
-        # sql += self._sql_comment(data)
+        if DBTYPE.upper() != "MYSQL":
+            sql += self._sql_comment(info, data)
 
         return sql
 
@@ -124,7 +152,7 @@ end;
         for i in range(rows):
             info = catalog[:i+1]
             table_content = pd.read_excel(STATIC_URL, sheet_name=tables[i])
-            # return table_content.iloc[2,:]
+            # return table_content
             if table_content.empty:
                 print("表 %s 读取失败"%tables[i])
             sql += self._create_sql_str(info, table_content)
