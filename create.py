@@ -35,10 +35,10 @@ class CreateSQL:
     def _format_data(self, data: pd.DataFrame):
         
         if DBTYPE.upper() == "MYSQL":
-            '''字段格式化为小写'''
+            '''字段格式化为小写，加上``'''
             n = data.shape[0]
             for i in range(n):
-                data.at[i,"字段"] = "{}".format(data.at[i,"字段"].lower())
+                data.at[i,"字段"] = "`{}`".format(data.at[i,"字段"].lower())
                 if data.at[i,"类型"].lower() == "integer":
                     data.at[i,"类型"] = "int"
                 # nan值判断
