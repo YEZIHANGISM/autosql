@@ -11,7 +11,7 @@ FILE_NAME = "测试数据字典.xlsx"
 
 STATIC_URL = os.path.join(FILE_DIR, FILE_NAME)
 
-# 存储结果目录
+# 存储结果目录，确保有这个目录存在
 RESULT_URL = 'sql'
 
 # 数据库类型

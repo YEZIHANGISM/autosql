@@ -247,22 +247,22 @@ class CreateSQL:
             print("未知的数据库类型")
 
     def _drop_sql(self, info: pd.DataFrame):
+        tb_name = info.at[0, "表名"]
         if DBTYPE.upper() == "MYSQL":
-            sqldrop = "drop table if exists %s;\n"%info.at[0, "表名"]
+            sqldrop = "drop table if exists {tbname};\n".format(tbname=tb_name)
         elif DBTYPE.upper() == "PGSQL":
-            sqldrop = "drop table if exists %s cascade;\n"%info.at[0, "表名"]
+            sqldrop = "drop table if exists {tbname} cascade;\n".format(tbname=tb_name)
         elif DBTYPE.upper() == "ORACLE":
-            sqldrop = '''
-declare num number;
-begin
-    select count(1) into num from user_tables where table_name = upper('%s');
-    if num > 0 then
-        execute immediate 'drop table %s';
-    end if;
-end;
-/
-'''%(info.at[0, "表名"], info.at[0, "表名"])
-
+            sqldrop = (
+                "declare num number;\n" \
+                "begin\n" \
+                "   select count(1) into num from user_tables where table_name = upper({tbname});\n" \
+                "if num > 0 then\n" \
+                "   execute immediate 'drop table {tbname}';\n" \
+                "   end if;\n" \
+                "end;\r\n" \
+                .format(tbname=tb_name)
+            )
         return sqldrop
 
     def _create_sql_str(self, info: pd.DataFrame, data: pd.DataFrame):
@@ -271,9 +271,6 @@ end;
         rtype: string
         '''
         tablename = info.at[0, "表名"]
-        pk = info.at[0,"主键"]
-        ch_name = info.at[0,"中文名"]
-        partition = info.at[0,"日期分区"]
         
         # 根据数据库不同，格式化表格数据
         if ISTRANSFORM:
@@ -301,19 +298,9 @@ end;
 
         catalog = pd.read_excel(STATIC_URL, sheet_name="目录")
         catalog = catalog[catalog["是否生成脚本"]==1].reset_index(drop=True)
-        titles = catalog.columns.values     # 获取列名
-        cols = catalog.shape[1]             # 获取行数
         rows = catalog.shape[0]             # 获取列数
-        content = catalog.values            # 获取所有内容，rtype: ndarray
-        colx = catalog.iloc[0].values       # 获取第一行的内容
-        colx = catalog.iloc[0, :]
-        col_slice = catalog.iloc[:, 2:4]    # 获取第2-4列的所有行内容
-        rowx = catalog.sample(1).values     # 获取前N行的内容
-        nan = np.isnan(colx[2])             # 判断值是否为nan
-        tables = catalog["表名"].values
-        cell = catalog.at[0,"是否生成脚本"]  # 取单值
-        cell = catalog.iat[0,0]             # 取单值，只能以数字为下标索引   
-        return catalog
+        tables = catalog["表名"].values 
+
         # 创建sql语句
         sql = ""
         for i in range(rows):
@@ -342,9 +329,6 @@ end;
 
 
 csql = CreateSQL()
-# table_sql = csql.create_table_sql()
-# print(table_sql)
-index_sql = csql.create_index_sql()
-print(index_sql)
-# drop_sql = csql.drop_table_sql()
-# print(drop_sql)
+create_table_sql = csql.create_table_sql
+create_index_sql = csql.create_index_sql
+drop_table_sql = csql.drop_table_sql
