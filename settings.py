@@ -22,3 +22,6 @@ RESULT_DIR = os.path.join(BASE_DIR, RESULT_URL)
 
 # 是否添加drop语句删除已存在的表
 IFDROP = True
+
+# 是否需要转换类型
+ISTRANSFORM = True
