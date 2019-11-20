@@ -15,7 +15,7 @@ STATIC_URL = os.path.join(FILE_DIR, FILE_NAME)
 RESULT_URL = 'sql'
 
 # 数据库类型
-DBTYPE = "oracle"
+DBTYPE = "pgsql"
 
 # 存储结果路径
 RESULT_DIR = os.path.join(BASE_DIR, RESULT_URL)
