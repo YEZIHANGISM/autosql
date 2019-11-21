@@ -1,16 +1,21 @@
-# import xlrd
 import pandas as pd
-from settings import *
 import numpy as np
 import re
-
+import os
 
 class CreateSQL:
-    # def __init__(self):
-    #     self.workbook = xlrd.open_workbook(FILE_DIR+FILE_NAME)
+    def __init__(self, path, file_name, dbtype, ifdrop, transform):
+        
+        self.path = path
+        self.file_name = file_name
+        self.dbtype = dbtype.upper()
+        self.ifdrop = ifdrop
+        self.transform = transform
+        self.static_url = os.path.join(self.path, self.file_name)
+        
 
     def _save_file(self, sql, filename):
-        save_dir = os.path.join(RESULT_DIR, DBTYPE.upper())
+        save_dir = os.path.join(self.path, self.dbtype)
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
         with open(os.path.join(save_dir, filename), "w", encoding='utf-8') as f:            
@@ -46,7 +51,7 @@ class CreateSQL:
             idxname = "IDX_{}".format(tb_name)
             uidxname = "UIDX_{}".format(tb_name)
             pkname = "PK_{}".format(tb_name)
-            if DBTYPE.upper() == "PGSQL":
+            if self.dbtype == "PGSQL":
                 if pk == 1:
                     # 主键
                     sqlindex += (
@@ -69,7 +74,7 @@ class CreateSQL:
                         "{fields}\n" \
                         ");\r\n".format(idxname=idxname, fields=",\n".join(fields.split(";")))
                     )
-            elif DBTYPE.upper() == "MYSQL":
+            elif self.dbtype == "MYSQL":
                 '''mysql使用存储过程删除索引'''
                 # 创建存储过程
                 procedure = "drop_index"
@@ -112,7 +117,7 @@ class CreateSQL:
                         ");\r\n".format(procedure=procedure, tbname=tb_name, idxname=idxname, fields=',\n'.join(fields.split(";")))
                     )
             
-            elif DBTYPE.upper() == "ORACLE":
+            elif self.dbtype == "ORACLE":
                 if pk == 1:
                     sqlindex += (
                         "declare num number;\n" \
@@ -168,7 +173,7 @@ class CreateSQL:
             default = data.at[i,"默认值"]
             key = data.at[i, "键"]
             extra = data.at[i, "扩展"]
-            if DBTYPE.upper() =="MYSQL":
+            if self.dbtype =="MYSQL":
                 fieldline = " ".join(["   ", field, ftype, default, key, extra, null, sign])
             else:
                 fieldline = " ".join(["   ", field, ftype, default, null])
@@ -180,7 +185,7 @@ class CreateSQL:
     def _format_data(self, data: pd.DataFrame):
         n = data.shape[0]
         
-        if DBTYPE.upper() == "MYSQL":
+        if self.dbtype == "MYSQL":
             '''字段格式化为小写，加上``'''
             for i in range(n):
                 data.at[i,"字段"] = "`{}`".format(data.at[i,"字段"].lower())
@@ -196,7 +201,7 @@ class CreateSQL:
                 data.at[i,"键"] = "" if data.at[i,"键"]!=data.at[i,"键"] else data.at[i,"键"]
                 data.at[i,"扩展"] = "" if data.at[i,"扩展"]!=data.at[i,"扩展"] else data.at[i,"扩展"]
         
-        elif DBTYPE.upper() == "ORACLE":
+        elif self.dbtype == "ORACLE":
             '''oracle表名和字段名在创建时自动转化为大写'''
             for i in range(n):
                 varchar = re.match(r'^[v|V]\w+', data.at[i, "类型"])
@@ -213,7 +218,7 @@ class CreateSQL:
                     data.at[i, "默认值"] = "default {}".format(data.at[i, "默认值"])
                 data.at[i,"非空"] = "not null" if data.at[i,"非空"] else("null" if data.at[i,"非空"]!=data.at[i,"非空"] else "")
         
-        elif DBTYPE.upper() == "PGSQL":
+        elif self.dbtype == "PGSQL":
             '''
             postgresql字段在创建时自动转化为小写
             date类型自动转化为timestamp，因为pgsql的date只支持日期
@@ -248,11 +253,11 @@ class CreateSQL:
 
     def _drop_sql(self, info: pd.DataFrame):
         tb_name = info.at[0, "表名"]
-        if DBTYPE.upper() == "MYSQL":
+        if self.dbtype == "MYSQL":
             sqldrop = "drop table if exists {tbname};\n".format(tbname=tb_name)
-        elif DBTYPE.upper() == "PGSQL":
+        elif self.dbtype == "PGSQL":
             sqldrop = "drop table if exists {tbname} cascade;\n".format(tbname=tb_name)
-        elif DBTYPE.upper() == "ORACLE":
+        elif self.dbtype == "ORACLE":
             sqldrop = (
                 "declare num number;\n" \
                 "begin\n" \
@@ -273,11 +278,11 @@ class CreateSQL:
         tablename = info.at[0, "表名"]
         
         # 根据数据库不同，格式化表格数据
-        if ISTRANSFORM:
+        if self.transform:
             self._format_data(data)
 
         # 删除
-        sql = self._drop_sql(info) if IFDROP else ""
+        sql = self._drop_sql(info) if self.ifdrop else ""
 
         '''
         建表
@@ -287,25 +292,27 @@ class CreateSQL:
         sql += "create table " + tablename + '(\n'
         print(data)
         sql += self._sql_body(data)
-        if DBTYPE.upper() != "MYSQL":
+        if self.dbtype != "MYSQL":
             sql += self._sql_comment(info, data)
 
         return sql
 
 
-    def create_table_sql(self):
+    def create_table(self):
         '''create table sql and export .sql file'''
 
-        catalog = pd.read_excel(STATIC_URL, sheet_name="目录")
+        catalog = pd.read_excel(self.static_url, sheet_name="目录")
         catalog = catalog[catalog["是否生成脚本"]==1].reset_index(drop=True)
-        rows = catalog.shape[0]             # 获取列数
+        
+        # 获取列数
+        rows = catalog.shape[0]             
         tables = catalog["表名"].values 
 
         # 创建sql语句
         sql = ""
         for i in range(rows):
             info = catalog[:i+1]
-            table_content = pd.read_excel(STATIC_URL, sheet_name=tables[i])
+            table_content = pd.read_excel(self.static_url, sheet_name=tables[i])
             # return table_content
             if table_content.empty:
                 print("表 %s 读取失败"%tables[i])
@@ -315,20 +322,26 @@ class CreateSQL:
         return self._save_file(sql, "create_table.sql")
         
 
-    def create_index_sql(self):
-        index = pd.read_excel(STATIC_URL, sheet_name="索引")
+    def create_index(self):
+        index = pd.read_excel(self.static_url, sheet_name="索引")
         index = index[index["是否有效"]==1].reset_index(drop=True)
         sqlindex = self._sql_index(index)
         return self._save_file(sqlindex, "create_index.sql")
 
-    def drop_table_sql(self):
-        catalog = pd.read_excel(STATIC_URL, sheet_name="目录")
+
+    def drop_table(self):
+        catalog = pd.read_excel(self.static_url, sheet_name="目录")
         sqldrop = self._drop_sql(catalog)
 
         return self._save_file(sqldrop, "drop_table.sql")
 
 
-csql = CreateSQL()
-create_table_sql = csql.create_table_sql
-create_index_sql = csql.create_index_sql
-drop_table_sql = csql.drop_table_sql
+class Create:
+    def get(self, path:str, file_name:str, dbtype='mysql', ifdrop=True, transform=True) -> object:
+        '''
+        返回创建SQL脚本对象
+        '''
+        return CreateSQL(path, file_name, dbtype, ifdrop, transform)
+
+
+autosql = Create()
