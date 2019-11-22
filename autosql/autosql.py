@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 import os
+from errors import DBError
 
 class CreateSQL:
     def __init__(self, path, file_name, dbtype, ifdrop, transform):
@@ -218,7 +219,7 @@ class CreateSQL:
                     data.at[i, "默认值"] = "default {}".format(data.at[i, "默认值"])
                 data.at[i,"非空"] = "not null" if data.at[i,"非空"] else("null" if data.at[i,"非空"]!=data.at[i,"非空"] else "")
         
-        elif self.dbtype == "PGSQL":
+        elif self.dbtype == "PGSQL" or self.dbtype == "POSTGRESQL":
             '''
             postgresql字段在创建时自动转化为小写
             date类型自动转化为timestamp，因为pgsql的date只支持日期
@@ -247,15 +248,13 @@ class CreateSQL:
                 else:
                     data.at[i, "默认值"] = ""
                 data.at[i,"非空"] = "not null" if data.at[i,"非空"] else("null" if data.at[i,"非空"]!=data.at[i,"非空"] else "")
-        
-        else:
-            print("未知的数据库类型")
+
 
     def _drop_sql(self, info: pd.DataFrame):
         tb_name = info.at[0, "表名"]
         if self.dbtype == "MYSQL":
             sqldrop = "drop table if exists {tbname};\n".format(tbname=tb_name)
-        elif self.dbtype == "PGSQL":
+        elif self.dbtype == "PGSQL" or self.dbtype == "POSTGRESQL":
             sqldrop = "drop table if exists {tbname} cascade;\n".format(tbname=tb_name)
         elif self.dbtype == "ORACLE":
             sqldrop = (
@@ -341,7 +340,10 @@ class Create:
         '''
         返回创建SQL脚本对象
         '''
-        return CreateSQL(path, file_name, dbtype, ifdrop, transform)
-
+        if dbtype.lower() not in ["mysql", "oracle", "pgsql", "postgresql"]:
+            raise DBError(dbtype)
+        else:
+            return CreateSQL(path, file_name, dbtype, ifdrop, transform)
 
 autosql = Create()
+get = autosql.get

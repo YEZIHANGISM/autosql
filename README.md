@@ -2,7 +2,7 @@
 一键生成SQL脚本
 
 # 支持的数据库
-Oracle；MySQL；PostgreSQL
+Oracle; MySQL; PostgreSQL
 
 # 支持的操作
 建表；建索引；删除表
@@ -11,7 +11,7 @@ Oracle；MySQL；PostgreSQL
 
         pip install autosql
 
-# 如何使用
+# 使用
 
         # test.py
         from autosql import autosql
@@ -24,21 +24,21 @@ Oracle；MySQL；PostgreSQL
 # autosql.get()
 参数：
 
-1. path: excel文件的路径
+1. path: excel文件路径
 
-2. file_name: 文件名
+2. file_name: excel文件名
 
-3. dbtype: 数据库名
+3. dbtype: 数据库
 
 4. ifdrop: 是否生成drop语句
 
-5. transform: 是否进行格式转换
+5. transform: 是否进行格式转换 
 
-# EXCEL文件的格式规范
-主要的sheet
+# EXCEL格式规范
+## sheets
 1. 目录
         
-        示例：
+        结构：
         
         中文名 | 表名 | 是否生成脚本 | 日期分区
         测试表 | Test | 1           | 0
@@ -46,4 +46,18 @@ Oracle；MySQL；PostgreSQL
 2. 索引
 
         示例：
-        
+        表名 | 索引列   | 是否主键 | 是否唯一索引 | 是否有效
+        Test | isValid | 0       | 0           | 1
+
+3. Test(表名)
+
+        示例:
+        字段     | 含义  | 类型 | 非空 | 默认值 | 键          | 扩展
+        id       | 标识 | int  | 是   |        | primary key | auto_increment
+        initdate | 时间 | Date | 是   | now()  |             |   
+
+## 函数
+表中的函数、数据类型、扩展等都默认为mysql格式，或者你可以自行填写，然后将格式转换设置为False，前提是你确保填写正确 
+
+        transform = False
+
